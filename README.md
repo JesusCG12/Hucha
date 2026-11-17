@@ -1,40 +1,160 @@
-# Hucha web (para instalar en el iPhone sin Mac)
+<div align="center">
 
-La misma app en versión web. Se instala en la pantalla de inicio del iPhone desde Safari,
-se abre a pantalla completa y funciona sin conexión.
+<img src="icons/icon-512.png" alt="Icono de Hucha" width="112">
 
-## Qué hay en esta carpeta
+# Hucha
 
-- `index.html`: la app entera (interfaz y lógica).
-- `manifest.webmanifest`, `sw.js` e `icons/`: lo que hace que se instale y funcione sin conexión.
+**Controla tus gastos del mes desde el móvil: cuánto te queda, en qué se te va el dinero y cuánto llevas ahorrado.**
 
-## Ponerla en tu iPhone con GitHub Pages (gratis)
+Gratis · Sin cuentas ni registros · Tus datos no salen de tu móvil · Funciona sin conexión
 
-1. En GitHub crea un repositorio público, por ejemplo `hucha`.
-2. Sube **el contenido de esta carpeta** (no la carpeta en sí): `index.html`, `sw.js`,
-   `manifest.webmanifest` y la carpeta `icons`.
-3. En el repositorio: **Settings → Pages → Build and deployment → Deploy from a branch**,
-   rama `main`, carpeta `/ (root)` y **Save**.
-4. Al cabo de un minuto estará en `https://TU_USUARIO.github.io/hucha/`.
-5. Abre esa dirección en **Safari** en el iPhone → botón **Compartir** →
-   **Añadir a pantalla de inicio**.
+### [👉 Abrir Hucha](https://jesuscg12.github.io/Hucha/)
 
-Vale cualquier otro alojamiento de archivos estáticos con HTTPS.
+<br>
 
-## Dónde se guardan los datos
+<img src="docs/capturas/resumen.png" alt="Pantalla de resumen" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/movimientos.png" alt="Lista de movimientos" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/resumen-oscuro.png" alt="Resumen en modo oscuro" width="240">
 
-En el propio iPhone, dentro de la app instalada. En GitHub solo está el código: tus gastos
-no salen del teléfono.
+</div>
 
-Haz una copia de vez en cuando en **Ajustes → Exportar copia**. Ese archivo `.json` se
-puede importar también en la app nativa de iPhone, y al revés.
+---
 
-## Probarla en el ordenador
+## ✨ Qué puedes hacer
 
-Desde esta carpeta:
+| | |
+|---|---|
+| 💶 **Ver lo disponible** | Pones un presupuesto mensual y Hucha te dice, en grande, cuánto te queda este mes y cuánto puedes gastar al día sin pasarte. |
+| 🧾 **Apuntar gastos e ingresos** | En dos toques: importe, categoría y listo. Puedes añadir una nota y cambiar la fecha. |
+| 🔁 **Gastos fijos y suscripciones** | Alquiler, Spotify, el coche, la nómina… Los apuntas una vez y se añaden solos cada mes el día que toca. Eliges si duran siempre o solo unos meses. |
+| 🔮 **Ver los próximos meses** | Los fijos que aún no han llegado salen como *previstos*, así sabes de antemano lo que te va a quedar. |
+| 🐷 **Hucha de ahorro** | Apartas dinero cuando quieras (o cada mes, como fijo) y ves cuánto llevas en total y lo que te falta para tu meta. Lo que apartas se resta de lo disponible. |
+| 📊 **Saber en qué se va** | Reparto por categorías, límites por categoría (te avisa si te pasas) y gráfico de los últimos seis meses. |
+| 🌙 **Modo oscuro** | Se pone solo si tu móvil lo usa. |
+
+---
+
+## 📲 Instalarla en el móvil
+
+Hucha es una web que se instala como una app: icono en la pantalla de inicio, pantalla completa y funciona sin conexión. No hace falta App Store.
+
+### iPhone
+
+1. Abre **[jesuscg12.github.io/Hucha](https://jesuscg12.github.io/Hucha/)** en **Safari**.
+2. Pulsa el botón **Compartir** (el cuadrado con la flecha hacia arriba).
+3. Baja y elige **Añadir a pantalla de inicio** → **Añadir**.
+4. Ábrela siempre desde el icono 🐷.
+
+### Android
+
+1. Abre **[jesuscg12.github.io/Hucha](https://jesuscg12.github.io/Hucha/)** en **Chrome**.
+2. Pulsa el menú **⋮** (arriba a la derecha).
+3. Elige **Instalar app** o **Añadir a pantalla de inicio**.
+
+> [!TIP]
+> También puedes usarla en el ordenador, en cualquier navegador. Pero ojo: cada dispositivo guarda sus propios datos (mira [Tus datos](#-tus-datos)).
+
+---
+
+## 🚀 Primeros pasos
+
+Al abrirla por primera vez verás **datos de ejemplo** para que te hagas una idea. Cuando quieras, pulsa **Empezar con mis datos** y se quedará vacía para ti.
+
+1. **Ajustes → Presupuesto mensual.** Pon lo que te permites gastar al mes (con los fijos incluidos).
+2. **Fijos → Añadir fijo.** Apunta lo que se repite: alquiler, suscripciones, gimnasio, la nómina… Elige el día del mes y cuánto dura (*Sin fin*, 3 meses, 12 meses…).
+3. **Ajustes → Hucha de ahorro** (opcional). Pon lo que ya tenías ahorrado y, si quieres, una meta.
+4. **Añadir.** Cada vez que gastes algo, apúntalo con el botón azul. Para guardar dinero, usa **Ahorro → Apartar a la hucha**.
+
+<div align="center">
+<img src="docs/capturas/nuevo.png" alt="Apuntar un gasto" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/fijos.png" alt="Gastos fijos" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/previstos.png" alt="Fijos previstos del mes que viene" width="240">
+</div>
+
+---
+
+## 🧭 Las cuatro pestañas
+
+**📊 Resumen.** Lo **disponible** del mes en grande, con una barra que marca el día de hoy para saber si vas bien de ritmo. Debajo: ingresos, gastos (con el ahorro incluido) y lo que has apartado; tu hucha con el total y la meta; en qué categorías se te va el dinero; y el gráfico de seis meses. Con las flechas cambias de mes, también a meses futuros para ver lo que te quedará.
+
+**🧾 Movimientos.** Todo lo apuntado en el mes, agrupado por días. Puedes filtrar por gastos, ingresos o ahorro. Toca uno para editarlo o borrarlo. Arriba aparecen los fijos **previstos** que aún no han llegado.
+
+**🔁 Fijos.** Lo que se repite cada mes, con su día, cuánto dura y si este mes ya se ha cargado o está pendiente. Puedes pausarlos, cambiarles la duración o borrarlos (lo ya apuntado no se toca).
+
+**⚙️ Ajustes.** Presupuesto, hucha de ahorro, categorías (con su emoji, color y límite mensual), copia de seguridad y borrar todo.
+
+<div align="center">
+<img src="docs/capturas/hucha.png" alt="Tu hucha de ahorro" width="240">
+</div>
+
+---
+
+## 🔒 Tus datos
+
+- **Todo se guarda en tu propio móvil**, dentro de la app. No hay servidor, ni cuenta, ni nadie más ve lo que apuntas (tampoco quien publica la app).
+- Cada dispositivo y navegador guarda sus datos por separado.
+- Si borras la app o los datos de Safari/Chrome, se borra lo que tenías. Por eso:
+
+> [!IMPORTANT]
+> Haz una copia de vez en cuando en **Ajustes → Exportar copia**. Se guarda un archivo `.json` con todo. Con **Importar copia** lo recuperas, o lo pasas a otro móvil.
+
+---
+
+## ❓ Preguntas frecuentes
+
+<details>
+<summary><b>¿Tengo que volver a apuntar las suscripciones cada mes?</b></summary>
+<br>
+No. Apúntalas en <b>Fijos</b> y Hucha las añade sola cada mes el día que toca. Antes de que llegue ese día las verás como <i>previstas</i>. Si una suscripción solo dura unos meses, elige su duración al crearla.
+</details>
+
+<details>
+<summary><b>¿El dinero que aparto a la hucha cuenta como gasto?</b></summary>
+<br>
+Sí: lo que apartas sale de lo disponible del mes y aparece sumado en «Gastos» (con la nota «incluye X € de ahorro»). Si luego sacas dinero de la hucha, vuelve a sumarse a lo disponible.
+</details>
+
+<details>
+<summary><b>¿Funciona sin internet?</b></summary>
+<br>
+Sí. Después de abrirla una vez con conexión, funciona sin internet. Las actualizaciones se descargan solas la próxima vez que la abras con conexión.
+</details>
+
+<details>
+<summary><b>¿Cómo la actualizo?</b></summary>
+<br>
+No tienes que hacer nada. Si quieres forzarlo, ábrela con conexión, ciérrala del todo (desliza hacia arriba en el multitarea) y vuelve a abrirla. Tus datos se mantienen.
+</details>
+
+<details>
+<summary><b>He cambiado de móvil, ¿cómo paso mis datos?</b></summary>
+<br>
+En el móvil viejo: <b>Ajustes → Exportar copia</b> y envíate el archivo (por ejemplo, a tu correo o a la nube). En el nuevo: instala Hucha, ve a <b>Ajustes → Importar copia</b> y elige ese archivo.
+</details>
+
+<details>
+<summary><b>¿Por qué no está en la App Store?</b></summary>
+<br>
+Porque no le hace falta: es una web instalable (PWA). Se instala desde el navegador, ocupa muy poco y se actualiza sola.
+</details>
+
+---
+
+## 🛠️ Para curiosos
+
+Hucha es una sola página web (`index.html`) con HTML, CSS y JavaScript, sin librerías ni servidor. Los datos se guardan con `localStorage` y el `sw.js` (service worker) permite usarla sin conexión.
 
 ```
-python -m http.server 8000
+├── index.html            ← la app entera
+├── sw.js                 ← modo sin conexión
+├── manifest.webmanifest  ← nombre, icono y colores al instalarla
+├── icons/                ← iconos de la app
+└── docs/capturas/        ← imágenes de este README
 ```
 
-y abre `http://localhost:8000`.
+¿Quieres tu propia copia? Haz un **fork** de este repositorio y activa **Settings → Pages → Deploy from a branch → main / (root)**. En un par de minutos tendrás tu Hucha en `https://TU_USUARIO.github.io/Hucha/`.
+
+<div align="center">
+<br>
+Hecho con 🐷 por <a href="https://github.com/JesusCG12">JesusCG12</a>
+</div>

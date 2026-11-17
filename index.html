@@ -200,10 +200,17 @@ main:focus { outline: none; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .lab { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .hint { font-size: 13px; color: var(--muted); }
-input[type="text"], input[type="date"], input[type="number"], input:not([type]) { width: 100%; min-height: 46px; padding: 8px 12px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; font-size: 16px; }
+input[type="text"], input[type="date"], input[type="number"], input:not([type]), select { width: 100%; min-height: 46px; padding: 8px 12px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; font-size: 16px; }
 input[type="date"] { -webkit-appearance: none; appearance: none; }
 .amount-box { display: flex; align-items: baseline; gap: 8px; border-bottom: 2.5px solid var(--pen); padding: 0 2px 4px; }
 .amount-box input { border: 0; background: none; padding: 0; min-height: 56px; font-family: var(--font-display); font-weight: 800; font-size: 44px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+select { -webkit-appearance: none; appearance: none; padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235A667C' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+.amt.save, .figures .v.save { color: var(--pen); }
+.planned .mov { opacity: 0.62; }
+.planned .bubble { border-style: dashed; }
+.hucha-total { font-family: var(--font-display); font-weight: 800; font-size: 38px; line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.hucha-total span { background: linear-gradient(transparent 62%, var(--mark) 62%, var(--mark) 94%, transparent 94%); padding: 0 4px 0 2px; margin-left: -2px; }
+.limit.goal .limit-bar span { background: var(--pen); }
 .amount-box input { flex: 0 1 auto; width: 5ch; min-width: 3ch; max-width: 100%; }
 .amount-box input:focus { outline: none; }
 .mov-main .chip { margin-top: 4px; font-size: 12px; }
@@ -295,7 +302,11 @@ const Core = (() => {
   const str = (v, d) => (typeof v === 'string' ? v : d);
   const nonNeg = v => (Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
   const kindOf = v => (v === 'income' ? 'income' : 'expense');
-  const FALLBACK = { expense: 'otros', income: 'otros-ingresos' };
+  // Tipos de movimiento: gasto, ingreso o ahorro (dinero que se aparta a la hucha o se saca de ella).
+  const typeOf = v => (v === 'income' || v === 'saving' ? v : 'expense');
+  const FALLBACK = { expense: 'otros', income: 'otros-ingresos', saving: 'hucha' };
+  const HUCHA = { id: 'hucha', name: 'Hucha', emoji: '🐷', color: '#2348C9', kind: 'saving' };
+  const monthDiff = (a, b) => (Number(b.slice(0, 4)) * 12 + Number(b.slice(5, 7))) - (Number(a.slice(0, 4)) * 12 + Number(a.slice(5, 7)));
 
   function addMonths(key, n) {
     const t = Number(key.slice(0, 4)) * 12 + (Number(key.slice(5, 7)) - 1) + n;
@@ -336,7 +347,7 @@ const Core = (() => {
     ];
   }
   function defaultState() {
-    return { version: 1, currency: 'EUR', budgetCents: 0, categories: defaultCategories(), movements: [], recurring: [] };
+    return { version: 1, currency: 'EUR', budgetCents: 0, savingsStartCents: 0, savingsGoalCents: 0, categories: defaultCategories(), movements: [], recurring: [] };
   }
 
   // Los constructores fijan el orden de las claves: así el mismo dato da siempre el mismo JSON.
@@ -352,7 +363,8 @@ const Core = (() => {
     return o;
   }
   function mkMovement(m) {
-    const o = { id: m.id, type: kindOf(m.type), cents: nonNeg(m.cents), categoryId: str(m.categoryId, ''), date: m.date, note: str(m.note, '').slice(0, 120) };
+    const o = { id: m.id, type: typeOf(m.type), cents: nonNeg(m.cents), categoryId: str(m.categoryId, ''), date: m.date, note: str(m.note, '').slice(0, 120) };
+    if (o.type === 'saving') { o.categoryId = 'hucha'; if (m.withdraw === true) o.withdraw = true; }
     if (typeof m.recurringId === 'string' && m.recurringId) o.recurringId = m.recurringId;
     o.created = Number.isFinite(m.created) ? m.created : 0;
     return o;
@@ -361,12 +373,13 @@ const Core = (() => {
     return {
       id: r.id,
       name: (str(r.name, '').trim() || 'Fijo').slice(0, 40),
-      type: kindOf(r.type),
+      type: typeOf(r.type),
       cents: nonNeg(r.cents),
-      categoryId: str(r.categoryId, ''),
+      categoryId: typeOf(r.type) === 'saving' ? 'hucha' : str(r.categoryId, ''),
       day: Math.min(31, Math.max(1, Number.isFinite(r.day) ? Math.round(r.day) : 1)),
       active: r.active !== false,
       startMonth: isMonth(r.startMonth) ? r.startMonth : nowMonth,
+      endMonth: isMonth(r.endMonth) ? r.endMonth : '',
       applied: Array.isArray(r.applied) ? [...new Set(r.applied.filter(isMonth))].sort() : [],
     };
   }
@@ -378,6 +391,8 @@ const Core = (() => {
     const s = defaultState();
     if (typeof raw.currency === 'string' && /^[A-Z]{3}$/.test(raw.currency)) s.currency = raw.currency;
     s.budgetCents = nonNeg(raw.budgetCents);
+    s.savingsStartCents = nonNeg(raw.savingsStartCents);
+    s.savingsGoalCents = nonNeg(raw.savingsGoalCents);
     if (Array.isArray(raw.categories) && raw.categories.length) {
       const seen = new Set();
       s.categories = [];
@@ -391,7 +406,7 @@ const Core = (() => {
       }
     }
     const kinds = new Map(s.categories.map(c => [c.id, c.kind]));
-    const fixCat = (id, type) => (kinds.get(id) === type ? id : FALLBACK[type]);
+    const fixCat = (id, type) => (type === 'saving' ? 'hucha' : kinds.get(id) === type ? id : FALLBACK[type]);
     const ids = new Set();
     for (const m of Array.isArray(raw.movements) ? raw.movements : []) {
       if (!m || typeof m.id !== 'string' || !m.id || ids.has(m.id) || !isDay(m.date)) continue;
@@ -411,7 +426,10 @@ const Core = (() => {
     return s;
   }
 
-  const category = (state, id) => state.categories.find(c => c.id === id) || { id: id, name: 'Sin categoría', emoji: '📦', color: '#7A8699', kind: 'expense' };
+  const category = (state, id) => (id === 'hucha' ? HUCHA : null) || state.categories.find(c => c.id === id) || { id: id, name: 'Sin categoría', emoji: '📦', color: '#7A8699', kind: 'expense' };
+
+  // ¿Cuenta este fijo en ese mes? (activo, ya empezado y sin haber terminado)
+  const inRange = (r, month) => r.active && r.startMonth <= month && (!r.endMonth || month <= r.endMonth);
 
   // Crea los movimientos de los fijos cuyo día ya ha llegado. Devuelve true si cambió algo.
   function applyRecurring(state, today) {
@@ -421,7 +439,7 @@ const Core = (() => {
     for (const r of state.recurring) {
       if (!r.active) continue;
       let month = r.startMonth;
-      for (let guard = 0; month <= current && guard < 600; guard++, month = addMonths(month, 1)) {
+      for (let guard = 0; month <= current && (!r.endMonth || month <= r.endMonth) && guard < 600; guard++, month = addMonths(month, 1)) {
         if (r.applied.includes(month)) continue;
         const date = month + '-' + pad(Math.min(r.day, daysIn(month)));
         if (date > today) continue;
@@ -438,24 +456,38 @@ const Core = (() => {
     return changed;
   }
 
+  // Cargos de los fijos que aún no han llegado en ese mes (este mes o meses futuros), como movimientos «previstos».
+  function planned(state, month, today) {
+    if (month < monthOf(today)) return [];
+    const out = [];
+    for (const r of state.recurring) {
+      if (!inRange(r, month) || r.applied.includes(month)) continue;
+      const m = mkMovement({ id: 'p-' + r.id + '-' + month, type: r.type, cents: r.cents, categoryId: r.categoryId, date: month + '-' + pad(Math.min(r.day, daysIn(month))), note: r.name, recurringId: r.id, created: 0 });
+      m.planned = true;
+      out.push(m);
+    }
+    return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1));
+  }
+  const savingFlow = m => (m.withdraw ? -m.cents : m.cents);
+
   function summary(state, month, today) {
-    let income = 0, spent = 0;
+    let income = 0, spent = 0, toHucha = 0, savingsTotal = state.savingsStartCents || 0;
     const by = new Map();
     for (const m of state.movements) {
-      if (m.date.slice(0, 7) !== month) continue;
+      const mk = m.date.slice(0, 7);
+      if (m.type === 'saving' && mk <= month) savingsTotal += savingFlow(m);
+      if (mk !== month) continue;
       if (m.type === 'income') income += m.cents;
+      else if (m.type === 'saving') toHucha += savingFlow(m);
       else { spent += m.cents; by.set(m.categoryId, (by.get(m.categoryId) || 0) + m.cents); }
     }
     const byCategory = [...by].map(([id, cents]) => ({ category: category(state, id), cents: cents }))
       .sort((a, b) => b.cents - a.cents || (a.category.name < b.category.name ? -1 : 1));
     const current = monthOf(today);
     const rel = month === current ? 'current' : month < current ? 'past' : 'future';
-    let pendingFixed = 0, pendingIncome = 0;
-    if (rel === 'current') {
-      for (const r of state.recurring) {
-        if (!r.active || r.startMonth > month || r.applied.includes(month)) continue;
-        if (r.type === 'expense') pendingFixed += r.cents; else pendingIncome += r.cents;
-      }
+    let pendingFixed = 0, pendingIncome = 0, pendingSaving = 0;
+    for (const p of planned(state, month, today)) {
+      if (p.type === 'expense') pendingFixed += p.cents; else if (p.type === 'income') pendingIncome += p.cents; else pendingSaving += p.cents;
     }
     const budget = state.budgetCents;
     const dim = daysIn(month);
@@ -463,7 +495,7 @@ const Core = (() => {
     const daysLeft = rel === 'current' ? dim - dayNum + 1 : 0;
     const remaining = budget - spent;
     const perDay = rel === 'current' && budget > 0 ? Math.max(0, Math.floor((remaining - pendingFixed) / daysLeft)) : 0;
-    return { income, spent, saved: income - spent, byCategory, pendingFixed, pendingIncome, budget, remaining, rel, dim, dayNum, daysLeft, perDay };
+    return { income, spent, saved: income - spent, toHucha, savingsTotal, goal: state.savingsGoalCents || 0, byCategory, pendingFixed, pendingIncome, pendingSaving, budget, remaining, rel, dim, dayNum, daysLeft, perDay };
   }
 
   function sortedForDisplay(list) {
@@ -473,7 +505,7 @@ const Core = (() => {
   // Reparto en documentos para guardar fuera de la página: uno de ajustes y uno por mes.
   function toDocs(state) {
     const docs = new Map();
-    docs.set('config', JSON.stringify({ budgetCents: state.budgetCents, currency: state.currency, categories: state.categories, recurring: state.recurring }));
+    docs.set('config', JSON.stringify({ budgetCents: state.budgetCents, currency: state.currency, savingsStartCents: state.savingsStartCents, savingsGoalCents: state.savingsGoalCents, categories: state.categories, recurring: state.recurring }));
     const months = new Map();
     for (const m of state.movements) {
       const k = m.date.slice(0, 7);
@@ -488,10 +520,11 @@ const Core = (() => {
   }
   // Devuelve un estado nuevo con el documento aplicado (json undefined = documento borrado).
   function applyDoc(state, id, json, today) {
-    const raw = { currency: state.currency, budgetCents: state.budgetCents, categories: state.categories, movements: state.movements, recurring: state.recurring };
+    const raw = { currency: state.currency, budgetCents: state.budgetCents, savingsStartCents: state.savingsStartCents, savingsGoalCents: state.savingsGoalCents, categories: state.categories, movements: state.movements, recurring: state.recurring };
     if (id === 'config') {
       const cfg = json === undefined ? defaultState() : JSON.parse(json);
       raw.currency = cfg.currency; raw.budgetCents = cfg.budgetCents; raw.categories = cfg.categories; raw.recurring = cfg.recurring;
+      raw.savingsStartCents = cfg.savingsStartCents; raw.savingsGoalCents = cfg.savingsGoalCents;
     } else if (/^m-\d{4}-\d{2}$/.test(id)) {
       const month = id.slice(2);
       const list = json === undefined ? [] : JSON.parse(json);
@@ -523,6 +556,8 @@ const Core = (() => {
   function demoState(today) {
     const s = defaultState();
     s.budgetCents = 95000;
+    s.savingsStartCents = 120000;
+    s.savingsGoalCents = 300000;
     const cur = monthOf(today), start = addMonths(cur, -5);
     let seed = 20261116;
     const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -533,7 +568,9 @@ const Core = (() => {
       ['Streaming', 'suscripciones', 1399, 5, 'expense'],
       ['Tarifa móvil', 'suscripciones', 1500, 27, 'expense'],
     ];
+    fixed.push(['Ahorro mensual', 'hucha', 10000, 2, 'saving']);
     fixed.forEach((f, i) => s.recurring.push(mkRecurring({ id: 'demo-' + (i + 1), name: f[0], type: f[4], cents: f[2], categoryId: f[1], day: f[3], active: true, startMonth: start, applied: [] }, cur)));
+    s.recurring.push(mkRecurring({ id: 'demo-curso', name: 'Curso de inglés', type: 'expense', cents: 3500, categoryId: 'estudios', day: 10, active: true, startMonth: addMonths(cur, -1), endMonth: addMonths(cur, 2), applied: [] }, cur));
     const vars = [
       ['super', ['Compra semanal', 'Frutería', 'Compra semanal'], 4, 18, 62],
       ['restaurantes', ['Menú del día', 'Café', 'Cena con amigos', 'Bocadillo'], 4, 3, 26],
@@ -562,7 +599,7 @@ const Core = (() => {
   }
 
   return { pad, dayStr, monthOf, isDay, isMonth, addMonths, daysIn, parseAmount, plainAmount, defaultCategories, defaultState,
-    mkCategory, mkMovement, mkRecurring, normalizeState, category, applyRecurring, summary, sortedForDisplay, toDocs, applyDoc, mergeMonth, mergeMonth3, demoState, FALLBACK };
+    mkCategory, mkMovement, mkRecurring, normalizeState, category, applyRecurring, planned, inRange, monthDiff, summary, sortedForDisplay, toDocs, applyDoc, mergeMonth, mergeMonth3, demoState, FALLBACK };
 })();
 /*CORE-END*/
 
@@ -599,7 +636,11 @@ const Core = (() => {
     if (!fmtCache[key]) fmtCache[key] = new Intl.NumberFormat('es-ES', digits === 0 ? { style: 'currency', currency: cur, maximumFractionDigits: 0 } : { style: 'currency', currency: cur });
     return fmtCache[key].format(cents / 100);
   }
-  const signed = m => (m.type === 'income' ? '+' : '−') + money(m.cents);
+  const plus = m => m.type === 'income' || (m.type === 'saving' && m.withdraw);
+  const signed = m => (plus(m) ? '+' : '−') + money(m.cents);
+  const flow = m => (plus(m) ? m.cents : -m.cents);
+  const amtClass = m => (m.type === 'income' ? 'pos' : m.type === 'saving' ? 'save' : '');
+  const shortMonth = key => monthName(key).slice(0, 3) + ' ' + key.slice(0, 4);
 
   /* ---------- Guardado ---------- */
   function loadLocal() {
@@ -758,24 +799,33 @@ const Core = (() => {
 
   function movRow(m) {
     const c = Core.category(S(), m.categoryId);
-    const title = m.note || c.name;
-    const sub = (m.note ? c.name : (m.type === 'income' ? 'Ingreso' : 'Gasto')) + (m.recurringId ? ' · Fijo' : '');
-    return '<li><button type="button" class="mov" data-act="mov" data-id="' + esc(m.id) + '">' +
+    const isSave = m.type === 'saving';
+    const saveLabel = m.withdraw ? 'Sacado de la hucha' : 'A la hucha';
+    const title = m.note || (isSave ? saveLabel : c.name);
+    let sub = isSave ? (m.note ? saveLabel : 'Ahorro') : (m.note ? c.name : (m.type === 'income' ? 'Ingreso' : 'Gasto'));
+    if (m.planned) sub = 'Previsto · ' + sub + ' · día ' + Number(m.date.slice(8, 10));
+    else if (m.recurringId) sub += ' · Fijo';
+    const act = m.planned ? 'data-act="rec" data-id="' + esc(m.recurringId) + '"' : 'data-act="mov" data-id="' + esc(m.id) + '"';
+    return '<li' + (m.planned ? ' class="planned"' : '') + '><button type="button" class="mov" ' + act + '>' +
       '<span class="bubble" style="--c:' + esc(c.color) + '" aria-hidden="true">' + esc(c.emoji) + '</span>' +
       '<span class="mov-main"><span class="mov-title">' + esc(title) + '</span><span class="mov-sub">' + esc(sub) + '</span></span>' +
-      '<span class="amt ' + (m.type === 'income' ? 'pos' : '') + '">' + signed(m) + '</span></button></li>';
+      '<span class="amt ' + amtClass(m) + '">' + signed(m) + '</span></button></li>';
   }
 
   function heroHTML(sum) {
     const mname = monthName(app.month);
+    const fut = sum.rel === 'future';
     if (!sum.budget) {
-      return '<section class="slip hero"><p class="eyebrow">Gastado en ' + mname + '</p>' +
-        '<p class="big"><span>' + money(sum.spent) + '</span></p>' +
+      const cents = fut ? sum.pendingFixed : sum.spent;
+      return '<section class="slip hero"><p class="eyebrow">' + (fut ? 'Fijos previstos en ' : 'Gastado en ') + mname + '</p>' +
+        '<p class="big"><span>' + money(cents) + '</span></p>' +
         '<p class="advice">Fija un presupuesto mensual y aquí verás cuánto te queda y cuánto puedes gastar al día.</p>' +
         '<div><button type="button" class="btn primary" data-act="goto" data-to="ajustes">Fijar presupuesto</button></div></section>';
     }
-    const over = sum.remaining < 0;
-    const pct = Math.min(100, Math.round(sum.spent / sum.budget * 100));
+    const used = fut ? sum.spent + sum.pendingFixed : sum.spent;
+    const left = sum.budget - used;
+    const over = left < 0;
+    const pct = Math.min(100, Math.round(used / sum.budget * 100));
     const dayPct = Math.round(sum.dayNum / sum.dim * 100);
     let eyebrow, chip = '', advice = '';
     if (sum.rel === 'current') {
@@ -790,16 +840,38 @@ const Core = (() => {
       eyebrow = over ? 'Te pasaste en ' + mname : 'Te sobraron en ' + mname;
       chip = over ? '<span class="chip bad">Mes cerrado por encima</span>' : '<span class="chip ok">Mes cerrado dentro</span>';
     } else {
-      eyebrow = 'Presupuesto de ' + mname;
+      eyebrow = over ? 'Los fijos superan el presupuesto de ' + mname : 'Te quedarán en ' + mname;
       chip = '<span class="chip idle">Mes sin empezar</span>';
+      advice = sum.pendingFixed > 0 ? 'Ya están descontados <b>' + money(sum.pendingFixed) + '</b> de gastos fijos previstos para ' + mname + '.' : 'No tienes gastos fijos previstos para ' + mname + '.';
     }
     return '<section class="slip hero"><div class="hero-top"><p class="eyebrow">' + eyebrow + '</p>' + chip + '</div>' +
-      '<p class="big' + (over ? ' over' : '') + '"><span>' + money(Math.abs(sum.remaining)) + '</span></p>' +
-      '<div class="pace"><div class="pace-bar' + (over ? ' over' : '') + '" role="img" aria-label="Gastado el ' + pct + ' % del presupuesto">' +
+      '<p class="big' + (over ? ' over' : '') + '"><span>' + money(Math.abs(left)) + '</span></p>' +
+      '<div class="pace"><div class="pace-bar' + (over ? ' over' : '') + '" role="img" aria-label="' + (fut ? 'Previsto' : 'Gastado') + ' el ' + pct + ' % del presupuesto">' +
       '<span class="fill" style="width:' + pct + '%"></span>' + (sum.rel === 'current' ? '<span class="today" style="left:' + dayPct + '%"></span>' : '') + '</div>' +
-      '<div class="pace-legend"><span>Gastado ' + money(sum.spent) + ' de ' + money(sum.budget) + '</span>' +
+      '<div class="pace-legend"><span>' + (fut ? 'Fijos previstos ' : 'Gastado ') + money(used) + ' de ' + money(sum.budget) + '</span>' +
       (sum.rel === 'current' ? '<span>Día ' + sum.dayNum + ' de ' + sum.dim + '</span>' : '') + '</div></div>' +
       (advice ? '<p class="advice">' + advice + '</p>' : '') + '</section>';
+  }
+
+  function huchaHTML(sum) {
+    const s = S();
+    const used = sum.savingsTotal !== 0 || sum.goal > 0 || s.movements.some(m => m.type === 'saving') || s.recurring.some(r => r.type === 'saving');
+    let body;
+    if (!used) {
+      body = '<p class="note">Aparta dinero cuando puedas y aquí verás todo lo que llevas ahorrado. Si ya tenías ahorros, apúntalos en Ajustes.</p>';
+    } else {
+      const delta = (sum.toHucha >= 0 ? '+' : '−') + money(Math.abs(sum.toHucha));
+      body = '<p class="hucha-total"><span>' + money(sum.savingsTotal) + '</span></p>' +
+        '<p class="note">' + cap(monthName(app.month)) + ': ' + delta + (sum.pendingSaving > 0 ? ' · ' + (sum.rel === 'future' ? 'previstos ' : 'faltan por apartar ') + money(sum.pendingSaving) + ' de ahorro fijo' : '') + '</p>';
+      if (sum.goal) {
+        const pct = Math.max(0, Math.min(100, Math.round(sum.savingsTotal / sum.goal * 100)));
+        const rest = sum.goal - sum.savingsTotal;
+        body += '<div class="limit goal"><div class="limit-bar"><span style="width:' + pct + '%"></span></div><span>' + pct + ' % de ' + money(sum.goal) + '</span></div>' +
+          '<p class="note">' + (rest > 0 ? 'Te faltan ' + money(rest) + ' para tu meta.' : 'Has llegado a tu meta.') + '</p>';
+      }
+    }
+    return '<section class="block"><div class="block-head"><h2>Tu hucha</h2><span class="note">' + (sum.rel === 'past' ? 'A final de ' + monthName(app.month) : 'Ahorrado en total') + '</span></div>' + body +
+      '<div><button type="button" class="btn" data-act="save-add">Apartar dinero</button></div></section>';
   }
 
   function chartHTML(s, t) {
@@ -848,29 +920,36 @@ const Core = (() => {
         }).join('') + '</ul>';
     }
     const recent = Core.sortedForDisplay(s.movements.filter(m => m.date.slice(0, 7) === app.month)).slice(0, 4);
-    const pendIn = sum.pendingIncome > 0 ? '<p class="note">Faltan por entrar ' + money(sum.pendingIncome) + ' de ingresos fijos.</p>' : '';
+    const pendIn = sum.pendingIncome > 0 ? '<p class="note">' + (sum.rel === 'future' ? 'Están previstos ' : 'Faltan por entrar ') + money(sum.pendingIncome) + ' de ingresos fijos.</p>' : '';
     return banner() + heroHTML(sum) +
       '<section class="figures" aria-label="Cifras del mes">' +
       '<div><span class="k">Ingresos</span><span class="v pos">' + money(sum.income) + '</span></div>' +
       '<div><span class="k">Gastos</span><span class="v">' + money(sum.spent) + '</span></div>' +
-      '<div><span class="k">Ahorro</span><span class="v ' + (sum.saved < 0 ? 'neg' : '') + '">' + money(sum.saved) + '</span></div></section>' + pendIn +
+      '<div><span class="k">A la hucha</span><span class="v save">' + (sum.toHucha < 0 ? '−' : '') + money(Math.abs(sum.toHucha)) + '</span></div></section>' + pendIn + huchaHTML(sum) +
       '<section class="block"><div class="block-head"><h2>En qué se va</h2><span class="note">' + cap(monthName(app.month)) + '</span></div>' + cats + '</section>' +
       '<section class="block"><div class="block-head"><h2>Seis meses</h2><div class="legend"><span><i style="background:var(--out)"></i>Gastos</span><span><i style="background:var(--in)"></i>Ingresos</span></div></div>' + chartHTML(s, t) + '</section>' +
       (recent.length ? '<section class="block"><div class="block-head"><h2>Lo último</h2><button type="button" class="btn link" data-act="goto" data-to="movimientos">Ver todos</button></div><ul class="rows" style="border:0">' + recent.map(movRow).join('') + '</ul></section>' : '');
   }
 
   function viewMovimientos() {
-    const s = S();
-    const list = Core.sortedForDisplay(s.movements.filter(m => m.date.slice(0, 7) === app.month && (app.filter === 'all' || m.type === app.filter)));
-    const seg = '<div class="seg" role="group" aria-label="Filtro">' + [['all', 'Todo'], ['expense', 'Gastos'], ['income', 'Ingresos']].map(f => '<button type="button" data-act="filter" data-f="' + f[0] + '" aria-pressed="' + (app.filter === f[0]) + '">' + f[1] + '</button>').join('') + '</div>';
-    if (!list.length) {
-      return banner() + seg + '<div class="empty"><p>No hay ' + (app.filter === 'income' ? 'ingresos' : app.filter === 'expense' ? 'gastos' : 'movimientos') + ' en ' + monthName(app.month) + '.</p><button type="button" class="btn primary" data-act="add">Añadir movimiento</button></div>';
+    const s = S(), t = today();
+    const match = m => app.filter === 'all' || m.type === app.filter;
+    const list = Core.sortedForDisplay(s.movements.filter(m => m.date.slice(0, 7) === app.month && match(m)));
+    const plan = Core.planned(s, app.month, t).filter(match);
+    const seg = '<div class="seg" role="group" aria-label="Filtro">' + [['all', 'Todo'], ['expense', 'Gastos'], ['income', 'Ingresos'], ['saving', 'Ahorro']].map(f => '<button type="button" data-act="filter" data-f="' + f[0] + '" aria-pressed="' + (app.filter === f[0]) + '">' + f[1] + '</button>').join('') + '</div>';
+    const netText = l => { const net = l.reduce((a, m) => a + flow(m), 0); return (net > 0 ? '+' : net < 0 ? '−' : '') + money(Math.abs(net)); };
+    let html = '';
+    if (plan.length) {
+      html += '<div class="day-head"><span>' + (app.month === Core.monthOf(t) ? 'Previsto para este mes' : 'Previsto en ' + monthName(app.month)) + '</span><span>' + netText(plan) + '</span></div><ul class="rows">' + plan.map(movRow).join('') + '</ul>';
     }
-    let html = '', day = null, bucket = [];
+    if (!list.length && !plan.length) {
+      const word = { income: 'ingresos', expense: 'gastos', saving: 'movimientos de ahorro' }[app.filter] || 'movimientos';
+      return banner() + seg + '<div class="empty"><p>No hay ' + word + ' en ' + monthName(app.month) + '.</p><button type="button" class="btn primary" data-act="add">Añadir movimiento</button></div>';
+    }
+    let day = null, bucket = [];
     const flushDay = () => {
       if (!bucket.length) return;
-      const net = bucket.reduce((a, m) => a + (m.type === 'income' ? m.cents : -m.cents), 0);
-      html += '<div class="day-head"><span>' + esc(dayTitle(day)) + '</span><span>' + (net > 0 ? '+' : net < 0 ? '−' : '') + money(Math.abs(net)) + '</span></div><ul class="rows">' + bucket.map(movRow).join('') + '</ul>';
+      html += '<div class="day-head"><span>' + esc(dayTitle(day)) + '</span><span>' + netText(bucket) + '</span></div><ul class="rows">' + bucket.map(movRow).join('') + '</ul>';
       bucket = [];
     };
     for (const m of list) { if (m.date !== day) { flushDay(); day = m.date; } bucket.push(m); }
@@ -882,21 +961,27 @@ const Core = (() => {
     const s = S(), cur = Core.monthOf(today());
     const row = r => {
       const c = Core.category(s, r.categoryId);
-      const st = !r.active ? '<span class="st">En pausa</span>' : r.applied.includes(cur) ? '<span class="st ok">' + (r.type === 'income' ? 'Cobrado' : 'Cargado') + ' este mes</span>' : '<span class="st warn">Pendiente este mes</span>';
+      let st;
+      if (!r.active) st = '<span class="st">En pausa</span>';
+      else if (r.endMonth && r.endMonth < cur) st = '<span class="st">Terminado</span>';
+      else if (r.startMonth > cur) st = '<span class="st">Empieza en ' + monthName(r.startMonth) + '</span>';
+      else if (r.applied.includes(cur)) st = '<span class="st ok">' + (r.type === 'income' ? 'Cobrado' : r.type === 'saving' ? 'Apartado' : 'Cargado') + ' este mes</span>';
+      else st = '<span class="st warn">Pendiente este mes</span>';
+      const dur = r.endMonth ? (r.endMonth < cur ? 'terminó en ' : 'hasta ') + shortMonth(r.endMonth) : 'sin fin';
       return '<li><button type="button" class="mov" data-act="rec" data-id="' + esc(r.id) + '"><span class="bubble" style="--c:' + esc(c.color) + '" aria-hidden="true">' + esc(c.emoji) + '</span>' +
-        '<span class="mov-main"><span class="mov-title">' + esc(r.name) + '</span><span class="mov-sub">Día ' + r.day + ' · ' + esc(c.name) + ' · ' + st + '</span></span>' +
-        '<span class="amt ' + (r.type === 'income' ? 'pos' : '') + '">' + (r.type === 'income' ? '+' : '−') + money(r.cents) + '</span></button></li>';
+        '<span class="mov-main"><span class="mov-title">' + esc(r.name) + '</span><span class="mov-sub">Día ' + r.day + ' · ' + esc(c.name) + ' · ' + dur + ' · ' + st + '</span></span>' +
+        '<span class="amt ' + amtClass(r) + '">' + (r.type === 'income' ? '+' : '−') + money(r.cents) + '</span></button></li>';
     };
-    const out = s.recurring.filter(r => r.type === 'expense'), inc = s.recurring.filter(r => r.type === 'income');
-    const sumOf = l => l.filter(r => r.active).reduce((a, r) => a + r.cents, 0);
+    const groups = [['expense', 'Gastos fijos'], ['income', 'Ingresos fijos'], ['saving', 'Ahorro fijo']].map(([type, label]) => [label, s.recurring.filter(r => r.type === type)]);
+    const sumOf = type => s.recurring.filter(r => r.type === type && Core.inRange(r, cur)).reduce((a, r) => a + r.cents, 0);
     if (!s.recurring.length) {
-      return banner() + '<div class="empty"><p>Apunta aquí lo que se repite cada mes: alquiler, suscripciones, gimnasio o la nómina. Hucha lo añade sola a tus movimientos el día que toca.</p><button type="button" class="btn primary" data-act="add">Añadir fijo</button></div>';
+      return banner() + '<div class="empty"><p>Apunta aquí lo que se repite cada mes: alquiler, suscripciones, la nómina o lo que apartas para ahorrar. Puedes hacer que dure siempre o solo unos meses, y Hucha lo apunta sola el día que toca.</p><button type="button" class="btn primary" data-act="add">Añadir fijo</button></div>';
     }
+    const saving = sumOf('saving');
     return banner() +
-      '<section class="figures" style="grid-template-columns:1fr 1fr" aria-label="Fijos al mes"><div><span class="k">Salen cada mes</span><span class="v">' + money(sumOf(out)) + '</span></div><div><span class="k">Entran cada mes</span><span class="v pos">' + money(sumOf(inc)) + '</span></div></section>' +
-      '<p class="hint">Hucha los apunta sola en Movimientos el día que toca.</p>' +
-      (out.length ? '<div class="day-head"><span>Gastos fijos</span><span>' + out.length + '</span></div><ul class="rows">' + out.map(row).join('') + '</ul>' : '') +
-      (inc.length ? '<div class="day-head"><span>Ingresos fijos</span><span>' + inc.length + '</span></div><ul class="rows">' + inc.map(row).join('') + '</ul>' : '');
+      '<section class="figures" style="grid-template-columns:1fr 1fr" aria-label="Fijos este mes"><div><span class="k">Salen cada mes</span><span class="v">' + money(sumOf('expense')) + '</span></div><div><span class="k">Entran cada mes</span><span class="v pos">' + money(sumOf('income')) + '</span></div></section>' +
+      '<p class="hint">Hucha los apunta sola en Movimientos el día que toca' + (saving ? ', y aparta ' + money(saving) + ' al mes en tu hucha' : '') + '. Los de los próximos meses aparecen como previstos.</p>' +
+      groups.filter(g => g[1].length).map(([label, list]) => '<div class="day-head"><span>' + label + '</span><span>' + list.length + '</span></div><ul class="rows">' + list.map(row).join('') + '</ul>').join('');
   }
 
   function viewAjustes() {
@@ -907,6 +992,10 @@ const Core = (() => {
     return banner() +
       '<section class="block"><h2>Presupuesto mensual</h2><p class="note">Lo que te permites gastar cada mes, fijos incluidos.</p>' +
       '<form data-form="budget" class="inline" novalidate><label class="field" for="budget" style="flex:1"><span class="lab">Importe en euros</span><input id="budget" name="budget" inputmode="decimal" autocomplete="off" placeholder="0,00" value="' + (s.budgetCents ? Core.plainAmount(s.budgetCents) : '') + '"></label><button type="submit" class="btn primary" style="align-self:flex-end">Guardar</button></form></section>' +
+      '<section class="block"><h2>Hucha de ahorro</h2><p class="note">Lo que ya tenías ahorrado antes de usar la app y, si quieres, una meta. Lo que apartes se va sumando y lo ves en el Resumen.</p>' +
+      '<form data-form="savings" class="form" novalidate><div class="two"><label class="field" for="sv-start"><span class="lab">Ya tenía ahorrado</span><input id="sv-start" name="start" inputmode="decimal" autocomplete="off" placeholder="0,00" value="' + (s.savingsStartCents ? Core.plainAmount(s.savingsStartCents) : '') + '"></label>' +
+      '<label class="field" for="sv-goal"><span class="lab">Meta</span><input id="sv-goal" name="goal" inputmode="decimal" autocomplete="off" placeholder="Sin meta" value="' + (s.savingsGoalCents ? Core.plainAmount(s.savingsGoalCents) : '') + '"></label></div>' +
+      '<div><button type="submit" class="btn primary">Guardar</button></div></form></section>' +
       '<section class="block"><div class="block-head"><h2>Categorías</h2><button type="button" class="btn link" data-act="cat-new">Nueva categoría</button></div>' +
       '<div class="day-head"><span>De gasto</span></div><ul class="rows">' + s.categories.filter(c => c.kind === 'expense').map(catRow).join('') + '</ul>' +
       '<div class="day-head"><span>De ingreso</span></div><ul class="rows">' + s.categories.filter(c => c.kind === 'income').map(catRow).join('') + '</ul></section>' +
@@ -973,36 +1062,62 @@ const Core = (() => {
   function drawChips() {
     const box = $('#cat-chips');
     if (!box || !ctx) return;
+    const saving = ctx.type === 'saving';
+    const cf = $('#cat-field'), df = $('#dir-field');
+    if (cf) cf.hidden = saving;
+    if (df) df.hidden = !saving;
+    if (saving) { ctx.categoryId = 'hucha'; return; }
     const cats = app.state.categories.filter(c => c.kind === ctx.type);
     if (!cats.some(c => c.id === ctx.categoryId)) ctx.categoryId = cats.length ? cats[0].id : Core.FALLBACK[ctx.type];
     box.innerHTML = cats.map(c => '<button type="button" class="pick" style="--c:' + esc(c.color) + '" data-act="pick-cat" data-id="' + esc(c.id) + '" aria-pressed="' + (c.id === ctx.categoryId) + '"><span aria-hidden="true">' + esc(c.emoji) + '</span>' + esc(c.name) + '</button>').join('');
   }
-  const chipsField = '<div class="field"><span class="lab" id="cat-lab">Categoría</span><div class="chips" id="cat-chips" role="group" aria-labelledby="cat-lab"></div></div>';
+  const chipsField = '<div class="field" id="cat-field"><span class="lab" id="cat-lab">Categoría</span><div class="chips" id="cat-chips" role="group" aria-labelledby="cat-lab"></div></div>';
   const errorLine = '<p class="form-error" id="form-error" role="alert" hidden></p>';
 
-  function movementModal(mov) {
+  function movementModal(mov, preset) {
     const t = today();
     const date = mov ? mov.date : (app.month === Core.monthOf(t) ? t : app.month + '-01');
-    openModal(mov ? 'Editar movimiento' : 'Nuevo movimiento',
-      '<form data-form="mov" class="form" novalidate>' + segHTML('type', [['expense', 'Gasto'], ['income', 'Ingreso']], mov ? mov.type : 'expense') +
+    const type = mov ? mov.type : (preset || 'expense');
+    const dir = mov && mov.withdraw ? 'out' : 'in';
+    openModal(mov ? 'Editar movimiento' : (type === 'saving' ? 'Apartar dinero' : 'Nuevo movimiento'),
+      '<form data-form="mov" class="form" novalidate>' + segHTML('type', [['expense', 'Gasto'], ['income', 'Ingreso'], ['saving', 'Ahorro']], type) +
       amountHTML('mov-amount', mov ? mov.cents : 0, 'Importe') + chipsField +
+      '<div class="field" id="dir-field" hidden><span class="lab">Qué haces</span>' + segHTML('dir', [['in', 'Apartar a la hucha'], ['out', 'Sacar de la hucha']], dir) + '</div>' +
       '<div class="two"><label class="field" for="mov-date"><span class="lab">Fecha</span><input type="date" id="mov-date" name="date" value="' + date + '"></label>' +
       '<label class="field" for="mov-note"><span class="lab">Nota</span><input type="text" id="mov-note" name="note" maxlength="80" placeholder="Opcional" autocomplete="off" value="' + esc(mov ? mov.note : '') + '"></label></div>' +
       errorLine + '<div class="actions">' + (mov ? '<button type="button" class="btn danger" data-act="delete">Borrar</button>' : '') + '<button type="submit" class="btn primary">Guardar</button></div></form>',
-      { kind: 'mov', id: mov ? mov.id : null, type: mov ? mov.type : 'expense', categoryId: mov ? mov.categoryId : null });
+      { kind: 'mov', id: mov ? mov.id : null, type: type, dir: dir, categoryId: mov ? mov.categoryId : null });
     drawChips();
   }
 
+  const DURATIONS = [0, 1, 2, 3, 4, 5, 6, 9, 12, 18, 24, 36];
+  function durHint() {
+    const sel = $('#rec-dur'), hint = $('#dur-hint');
+    if (!sel || !hint || !ctx) return;
+    const start = $('#rec-start') ? $('#rec-start').value : ctx.startMonth;
+    const n = Number(sel.value) || 0;
+    const end = Core.addMonths(start, Math.max(0, n - 1));
+    hint.textContent = n === 0 ? 'Se repite todos los meses hasta que lo pauses o lo borres.' : n === 1 ? 'Solo se apunta en ' + monthName(start) + ' de ' + start.slice(0, 4) + '.' : 'Desde ' + monthName(start) + ' de ' + start.slice(0, 4) + ' hasta ' + monthName(end) + ' de ' + end.slice(0, 4) + ', ambos incluidos.';
+  }
   function recurringModal(rec) {
+    const cur = Core.monthOf(today()), next = Core.addMonths(cur, 1);
+    const n = rec && rec.endMonth ? Core.monthDiff(rec.startMonth, rec.endMonth) + 1 : 0;
+    const opts = DURATIONS.includes(n) ? DURATIONS : DURATIONS.concat(n).sort((a, b) => a - b);
+    const durSel = '<label class="field" for="rec-dur"><span class="lab">Duración</span><select id="rec-dur" name="dur">' +
+      opts.map(v => '<option value="' + v + '"' + (v === n ? ' selected' : '') + '>' + (v === 0 ? 'Sin fin' : v === 1 ? 'Solo 1 mes' : v + ' meses') + '</option>').join('') + '</select></label>';
+    const startSel = rec ? '<div class="field"><span class="lab">Empezó</span><input type="text" value="' + esc(cap(monthName(rec.startMonth)) + ' ' + rec.startMonth.slice(0, 4)) + '" disabled></div>'
+      : '<label class="field" for="rec-start"><span class="lab">Empieza</span><select id="rec-start" name="start"><option value="' + cur + '">Este mes</option><option value="' + next + '">El mes que viene</option></select></label>';
     openModal(rec ? 'Editar fijo' : 'Nuevo fijo',
-      '<form data-form="rec" class="form" novalidate>' + segHTML('type', [['expense', 'Gasto fijo'], ['income', 'Ingreso fijo']], rec ? rec.type : 'expense') +
-      '<label class="field" for="rec-name"><span class="lab">Nombre</span><input type="text" id="rec-name" name="name" maxlength="40" placeholder="Alquiler, gimnasio, nómina…" autocomplete="off" value="' + esc(rec ? rec.name : '') + '"' + (rec ? '' : ' data-autofocus') + '></label>' +
+      '<form data-form="rec" class="form" novalidate>' + segHTML('type', [['expense', 'Gasto'], ['income', 'Ingreso'], ['saving', 'Ahorro']], rec ? rec.type : 'expense') +
+      '<label class="field" for="rec-name"><span class="lab">Nombre</span><input type="text" id="rec-name" name="name" maxlength="40" placeholder="Alquiler, Spotify, nómina, ahorro…" autocomplete="off" value="' + esc(rec ? rec.name : '') + '"' + (rec ? '' : ' data-autofocus') + '></label>' +
       amountHTML('rec-amount', rec ? rec.cents : 0, 'Importe al mes').replace(' data-autofocus', '') + chipsField +
-      '<label class="field" for="rec-day"><span class="lab">Día del mes</span><input type="number" id="rec-day" name="day" min="1" max="31" inputmode="numeric" value="' + (rec ? rec.day : 1) + '"><span class="hint">En los meses más cortos se carga el último día.</span></label>' +
-      (rec ? '<label class="check" for="rec-active"><input type="checkbox" id="rec-active" name="active"' + (rec.active ? ' checked' : '') + '>Activo</label><p class="hint">Los cambios valen para los próximos cargos; los ya apuntados no se tocan.</p>' : '') +
+      '<label class="field" for="rec-day"><span class="lab">Día del mes</span><input type="number" id="rec-day" name="day" min="1" max="31" inputmode="numeric" value="' + (rec ? rec.day : 1) + '"><span class="hint">En los meses más cortos se apunta el último día.</span></label>' +
+      '<div class="two">' + startSel + durSel + '</div><p class="hint" id="dur-hint"></p>' +
+      (rec ? '<label class="check" for="rec-active"><input type="checkbox" id="rec-active" name="active"' + (rec.active ? ' checked' : '') + '>Activo</label><p class="hint">Los cambios valen para los próximos meses; lo ya apuntado no se toca.</p>' : '') +
       errorLine + '<div class="actions">' + (rec ? '<button type="button" class="btn danger" data-act="delete">Borrar</button>' : '') + '<button type="submit" class="btn primary">Guardar</button></div></form>',
-      { kind: 'rec', id: rec ? rec.id : null, type: rec ? rec.type : 'expense', categoryId: rec ? rec.categoryId : null });
+      { kind: 'rec', id: rec ? rec.id : null, type: rec ? rec.type : 'expense', categoryId: rec ? rec.categoryId : null, startMonth: rec ? rec.startMonth : cur });
     drawChips();
+    durHint();
   }
 
   function drawSwatches() {
@@ -1056,12 +1171,13 @@ const Core = (() => {
       const date = form.elements.date.value;
       if (!Core.isDay(date)) { formError('Elige una fecha.'); return; }
       const old = ctx.id ? app.state.movements.find(m => m.id === ctx.id) : null;
-      const mov = Core.mkMovement({ id: old ? old.id : uid(), type: ctx.type, cents: cents, categoryId: ctx.categoryId, date: date, note: form.elements.note.value.trim(), recurringId: old ? old.recurringId : undefined, created: old ? old.created : Date.now() / 1000 });
+      const mov = Core.mkMovement({ id: old ? old.id : uid(), type: ctx.type, cents: cents, categoryId: ctx.type === 'saving' ? 'hucha' : ctx.categoryId, date: date, note: form.elements.note.value.trim(), withdraw: ctx.type === 'saving' && ctx.dir === 'out', recurringId: old ? old.recurringId : undefined, created: old ? old.created : Date.now() / 1000 });
       if (old) app.state.movements[app.state.movements.indexOf(old)] = mov; else app.state.movements.push(mov);
       if (app.tab === 'resumen' || app.tab === 'movimientos') app.month = Core.monthOf(date);
       closeModal();
       app.keepScroll = !!old;
-      commit(old ? 'Movimiento actualizado' : (mov.type === 'income' ? 'Ingreso' : 'Gasto') + ' de ' + money(cents) + ' apuntado');
+      const what = mov.type === 'saving' ? (mov.withdraw ? 'Sacados ' + money(cents) + ' de la hucha' : 'Apartados ' + money(cents) + ' a la hucha') : (mov.type === 'income' ? 'Ingreso' : 'Gasto') + ' de ' + money(cents) + ' apuntado';
+      commit(old ? 'Movimiento actualizado' : what);
     },
     rec(form) {
       const name = form.elements.name.value.trim();
@@ -1073,12 +1189,26 @@ const Core = (() => {
       const cur = Core.monthOf(today());
       const old = ctx.id ? app.state.recurring.find(r => r.id === ctx.id) : null;
       const active = old ? form.elements.active.checked : true;
-      const rec = Core.mkRecurring({ id: old ? old.id : uid(), name: name, type: ctx.type, cents: cents, categoryId: ctx.categoryId, day: day, active: active,
-        startMonth: old && !(active && !old.active) ? old.startMonth : cur, applied: old ? old.applied : [] }, cur);
+      const picked = form.elements.start && Core.isMonth(form.elements.start.value) ? form.elements.start.value : cur;
+      const startMonth = old ? (active && !old.active ? cur : old.startMonth) : picked;
+      const months = Number(form.elements.dur.value) || 0;
+      const endMonth = months > 0 ? Core.addMonths(startMonth, months - 1) : '';
+      const rec = Core.mkRecurring({ id: old ? old.id : uid(), name: name, type: ctx.type, cents: cents, categoryId: ctx.type === 'saving' ? 'hucha' : ctx.categoryId, day: day, active: active,
+        startMonth: startMonth, endMonth: endMonth, applied: old ? old.applied : [] }, cur);
       if (old) app.state.recurring[app.state.recurring.indexOf(old)] = rec; else app.state.recurring.push(rec);
       closeModal();
       app.keepScroll = true;
       commit(old ? 'Fijo actualizado' : 'Fijo añadido: ' + name);
+    },
+    savings(form) {
+      if (!real()) return;
+      const a = form.elements.start.value.trim(), b = form.elements.goal.value.trim();
+      const start = a ? Core.parseAmount(a) : 0, goal = b ? Core.parseAmount(b) : 0;
+      if (start === null || goal === null) { toast('Escribe los importes como 1200 o 1.500,50.'); return; }
+      app.state.savingsStartCents = start;
+      app.state.savingsGoalCents = goal;
+      app.keepScroll = true;
+      commit('Hucha guardada');
     },
     cat(form) {
       const name = form.elements.name.value.trim();
@@ -1128,7 +1258,7 @@ const Core = (() => {
   async function exportBackup() {
     if (!real()) return;
     const st = app.state;
-    const data = JSON.stringify({ version: 1, currency: st.currency, budgetCents: st.budgetCents, categories: st.categories, movements: st.movements, recurring: st.recurring }, null, 2);
+    const data = JSON.stringify({ version: 1, currency: st.currency, budgetCents: st.budgetCents, savingsStartCents: st.savingsStartCents, savingsGoalCents: st.savingsGoalCents, categories: st.categories, movements: st.movements, recurring: st.recurring }, null, 2);
     const filename = 'hucha-copia-' + today() + '.json';
     if (downloads) {
       try { await downloads.save({ filename: filename, data: data }); toast('Copia guardada'); }
@@ -1180,6 +1310,10 @@ const Core = (() => {
       if (wasDemo) { exitDemo(); render(); }
       if (app.tab === 'fijos') recurringModal(null); else movementModal(null);
     },
+    'save-add'() {
+      if (app.demo) { exitDemo(); render(); }
+      movementModal(null, 'saving');
+    },
     start() { closeModal(); exitDemo(); render(); toast('Listo. Empieza fijando tu presupuesto o apuntando un gasto.'); },
     mov(el) { if (!real()) return; const m = app.state.movements.find(x => x.id === el.dataset.id); if (m) movementModal(m); },
     rec(el) { if (!real()) return; const r = app.state.recurring.find(x => x.id === el.dataset.id); if (r) recurringModal(r); },
@@ -1190,7 +1324,7 @@ const Core = (() => {
     delete(el) { deleteCurrent(el); },
     seg(el) {
       if (!ctx) return;
-      ctx.type = el.dataset.value;
+      if (el.dataset.name === 'dir') ctx.dir = el.dataset.value; else ctx.type = el.dataset.value;
       el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
       drawChips();
       const lf = $('#limit-field');
@@ -1202,7 +1336,7 @@ const Core = (() => {
     import() { $('#import-file').click(); },
     reset() {
       if (!real()) return;
-      confirmModal('Borrar todos los datos', 'Se borran movimientos, fijos, categorías propias y presupuesto. No se puede deshacer; si dudas, exporta antes una copia.', 'Borrar todo', () => {
+      confirmModal('Borrar todos los datos', 'Se borran movimientos, fijos, hucha, categorías propias y presupuesto. No se puede deshacer; si dudas, exporta antes una copia.', 'Borrar todo', () => {
         app.state = Core.defaultState();
         closeModal();
         commit('Datos borrados');
@@ -1232,6 +1366,7 @@ const Core = (() => {
     const fn = forms[e.target.dataset.form];
     if (fn) fn(e.target);
   });
+  document.addEventListener('change', e => { if (e.target.id === 'rec-dur' || e.target.id === 'rec-start') durHint(); });
   document.addEventListener('input', e => {
     if (e.target.matches && e.target.matches('.amount-box input')) fitAmount(e.target);
     const err = document.getElementById('form-error');

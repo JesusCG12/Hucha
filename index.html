@@ -143,6 +143,7 @@ main:focus { outline: none; }
 .figures > div + div { border-left: 1px dashed var(--rule); }
 .figures .k { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .figures .v { font-family: var(--font-display); font-weight: 700; font-size: clamp(15px, 4.6vw, 20px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.figures .sub { font-size: 12px; color: var(--muted); line-height: 1.25; }
 .pos { color: var(--in); }
 .neg { color: var(--out); }
 
@@ -481,6 +482,7 @@ const Core = (() => {
       else if (m.type === 'saving') toHucha += savingFlow(m);
       else { spent += m.cents; by.set(m.categoryId, (by.get(m.categoryId) || 0) + m.cents); }
     }
+    if (toHucha > 0) by.set('hucha', toHucha);
     const byCategory = [...by].map(([id, cents]) => ({ category: category(state, id), cents: cents }))
       .sort((a, b) => b.cents - a.cents || (a.category.name < b.category.name ? -1 : 1));
     const current = monthOf(today);
@@ -493,9 +495,11 @@ const Core = (() => {
     const dim = daysIn(month);
     const dayNum = rel === 'current' ? Number(today.slice(8, 10)) : rel === 'past' ? dim : 0;
     const daysLeft = rel === 'current' ? dim - dayNum + 1 : 0;
-    const remaining = budget - spent;
-    const perDay = rel === 'current' && budget > 0 ? Math.max(0, Math.floor((remaining - pendingFixed) / daysLeft)) : 0;
-    return { income, spent, saved: income - spent, toHucha, savingsTotal, goal: state.savingsGoalCents || 0, byCategory, pendingFixed, pendingIncome, pendingSaving, budget, remaining, rel, dim, dayNum, daysLeft, perDay };
+    // Lo apartado a la hucha también sale del dinero del mes: cuenta como gasto para lo disponible.
+    const outflow = spent + toHucha;
+    const remaining = budget - outflow;
+    const perDay = rel === 'current' && budget > 0 ? Math.max(0, Math.floor((remaining - pendingFixed - pendingSaving) / daysLeft)) : 0;
+    return { income, spent, saved: income - spent, outflow, toHucha, savingsTotal, goal: state.savingsGoalCents || 0, byCategory, pendingFixed, pendingIncome, pendingSaving, budget, remaining, rel, dim, dayNum, daysLeft, perDay };
   }
 
   function sortedForDisplay(list) {
@@ -815,40 +819,46 @@ const Core = (() => {
   function heroHTML(sum) {
     const mname = monthName(app.month);
     const fut = sum.rel === 'future';
+    const pend = sum.pendingFixed + sum.pendingSaving;
+    const pendText = () => {
+      const parts = [];
+      if (sum.pendingFixed > 0) parts.push(money(sum.pendingFixed) + ' de gastos fijos');
+      if (sum.pendingSaving > 0) parts.push(money(sum.pendingSaving) + ' de ahorro fijo');
+      return parts.join(' y ');
+    };
     if (!sum.budget) {
-      const cents = fut ? sum.pendingFixed : sum.spent;
-      return '<section class="slip hero"><p class="eyebrow">' + (fut ? 'Fijos previstos en ' : 'Gastado en ') + mname + '</p>' +
-        '<p class="big"><span>' + money(cents) + '</span></p>' +
-        '<p class="advice">Fija un presupuesto mensual y aquí verás cuánto te queda y cuánto puedes gastar al día.</p>' +
+      const avail = sum.income - sum.outflow - (fut || sum.rel === 'current' ? pend : 0) + (fut || sum.rel === 'current' ? sum.pendingIncome : 0);
+      return '<section class="slip hero"><p class="eyebrow">Disponible ' + (fut ? 'en ' : sum.rel === 'past' ? 'al cerrar ' : 'este mes') + (sum.rel === 'current' ? '' : mname) + '</p>' +
+        '<p class="big' + (avail < 0 ? ' over' : '') + '"><span>' + (avail < 0 ? '−' : '') + money(Math.abs(avail)) + '</span></p>' +
+        '<p class="advice">Ingresos menos gastos y lo apartado a la hucha' + (pend || sum.pendingIncome ? ', contando los fijos que faltan' : '') + '. Fija un presupuesto para ver también cuánto puedes gastar al día.</p>' +
         '<div><button type="button" class="btn primary" data-act="goto" data-to="ajustes">Fijar presupuesto</button></div></section>';
     }
-    const used = fut ? sum.spent + sum.pendingFixed : sum.spent;
+    const used = fut ? sum.outflow + pend : sum.outflow;
     const left = sum.budget - used;
     const over = left < 0;
     const pct = Math.min(100, Math.round(used / sum.budget * 100));
     const dayPct = Math.round(sum.dayNum / sum.dim * 100);
     let eyebrow, chip = '', advice = '';
     if (sum.rel === 'current') {
-      eyebrow = over ? 'Te has pasado este mes' : 'Te quedan este mes';
+      eyebrow = over ? 'Te has pasado este mes' : 'Disponible este mes';
       if (over) chip = '<span class="chip bad">Presupuesto superado</span>';
-      else if (sum.spent * sum.dim <= sum.budget * sum.dayNum) chip = '<span class="chip ok">Vas bien de ritmo</span>';
+      else if (sum.outflow * sum.dim <= sum.budget * sum.dayNum) chip = '<span class="chip ok">Vas bien de ritmo</span>';
       else chip = '<span class="chip warn">Gastas más rápido que el mes</span>';
-      const pend = sum.pendingFixed > 0 ? ' Ya están descontados ' + money(sum.pendingFixed) + ' de gastos fijos que faltan por cargar.' : '';
-      if (over) advice = 'Llevas gastados ' + money(sum.spent) + ' con un presupuesto de ' + money(sum.budget) + '.' + (sum.pendingFixed > 0 ? ' Aún faltan por cargar ' + money(sum.pendingFixed) + ' de gastos fijos.' : '');
-      else advice = 'Puedes gastar <b>' + money(sum.perDay) + '</b> al día durante ' + (sum.daysLeft === 1 ? 'el día que queda' : 'los ' + sum.daysLeft + ' días que quedan') + '.' + pend;
+      if (over) advice = 'Has superado tu presupuesto de ' + money(sum.budget) + '.' + (pend > 0 ? ' Aún faltan ' + pendText() + '.' : '');
+      else advice = 'Puedes gastar <b>' + money(sum.perDay) + '</b> al día durante ' + (sum.daysLeft === 1 ? 'el día que queda' : 'los ' + sum.daysLeft + ' días que quedan') + '.' + (pend > 0 ? ' Ya están descontados ' + pendText() + ' que faltan.' : '');
     } else if (sum.rel === 'past') {
       eyebrow = over ? 'Te pasaste en ' + mname : 'Te sobraron en ' + mname;
       chip = over ? '<span class="chip bad">Mes cerrado por encima</span>' : '<span class="chip ok">Mes cerrado dentro</span>';
     } else {
-      eyebrow = over ? 'Los fijos superan el presupuesto de ' + mname : 'Te quedarán en ' + mname;
+      eyebrow = over ? 'Los fijos superan el presupuesto de ' + mname : 'Disponible en ' + mname;
       chip = '<span class="chip idle">Mes sin empezar</span>';
-      advice = sum.pendingFixed > 0 ? 'Ya están descontados <b>' + money(sum.pendingFixed) + '</b> de gastos fijos previstos para ' + mname + '.' : 'No tienes gastos fijos previstos para ' + mname + '.';
+      advice = pend > 0 ? 'Ya están descontados ' + pendText() + ' previstos.' : 'No tienes fijos previstos para ' + mname + '.';
     }
     return '<section class="slip hero"><div class="hero-top"><p class="eyebrow">' + eyebrow + '</p>' + chip + '</div>' +
       '<p class="big' + (over ? ' over' : '') + '"><span>' + money(Math.abs(left)) + '</span></p>' +
-      '<div class="pace"><div class="pace-bar' + (over ? ' over' : '') + '" role="img" aria-label="' + (fut ? 'Previsto' : 'Gastado') + ' el ' + pct + ' % del presupuesto">' +
+      '<div class="pace"><div class="pace-bar' + (over ? ' over' : '') + '" role="img" aria-label="Usado el ' + pct + ' % del presupuesto">' +
       '<span class="fill" style="width:' + pct + '%"></span>' + (sum.rel === 'current' ? '<span class="today" style="left:' + dayPct + '%"></span>' : '') + '</div>' +
-      '<div class="pace-legend"><span>' + (fut ? 'Fijos previstos ' : 'Gastado ') + money(used) + ' de ' + money(sum.budget) + '</span>' +
+      '<div class="pace-legend"><span>Presupuesto de ' + money(sum.budget) + '</span>' +
       (sum.rel === 'current' ? '<span>Día ' + sum.dayNum + ' de ' + sum.dim + '</span>' : '') + '</div></div>' +
       (advice ? '<p class="advice">' + advice + '</p>' : '') + '</section>';
   }
@@ -877,7 +887,7 @@ const Core = (() => {
   function chartHTML(s, t) {
     const keys = [];
     for (let i = -5; i <= 0; i++) keys.push(Core.addMonths(app.month, i));
-    const data = keys.map(k => { const x = Core.summary(s, k, t); return { key: k, spent: x.spent, income: x.income }; });
+    const data = keys.map(k => { const x = Core.summary(s, k, t); return { key: k, spent: x.outflow, income: x.income }; });
     const maxCents = Math.max(1, ...data.map(d => Math.max(d.spent, d.income)));
     const units = maxCents / 100;
     const mag = Math.pow(10, Math.floor(Math.log10(Math.max(units, 1))));
@@ -903,7 +913,7 @@ const Core = (() => {
 
   function viewResumen() {
     const s = S(), t = today(), sum = Core.summary(s, app.month, t);
-    const total = sum.spent;
+    const total = sum.byCategory.reduce((a, x) => a + x.cents, 0);
     let cats;
     if (!sum.byCategory.length) {
       cats = '<p class="note">Sin gastos en ' + monthName(app.month) + '.</p>';
@@ -924,7 +934,7 @@ const Core = (() => {
     return banner() + heroHTML(sum) +
       '<section class="figures" aria-label="Cifras del mes">' +
       '<div><span class="k">Ingresos</span><span class="v pos">' + money(sum.income) + '</span></div>' +
-      '<div><span class="k">Gastos</span><span class="v">' + money(sum.spent) + '</span></div>' +
+      '<div><span class="k">Gastos</span><span class="v">' + money(sum.outflow) + '</span>' + (sum.toHucha ? '<span class="sub">incluye ' + (sum.toHucha < 0 ? '−' : '') + money(Math.abs(sum.toHucha)) + ' de ahorro</span>' : '') + '</div>' +
       '<div><span class="k">A la hucha</span><span class="v save">' + (sum.toHucha < 0 ? '−' : '') + money(Math.abs(sum.toHucha)) + '</span></div></section>' + pendIn + huchaHTML(sum) +
       '<section class="block"><div class="block-head"><h2>En qué se va</h2><span class="note">' + cap(monthName(app.month)) + '</span></div>' + cats + '</section>' +
       '<section class="block"><div class="block-head"><h2>Seis meses</h2><div class="legend"><span><i style="background:var(--out)"></i>Gastos</span><span><i style="background:var(--in)"></i>Ingresos</span></div></div>' + chartHTML(s, t) + '</section>' +

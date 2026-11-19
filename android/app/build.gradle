@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+// El número de versión lo pone GitHub Actions (-PversionCode=N); en local vale 1.
+def huchaVersion = (project.findProperty('versionCode') ?: '1').toString().toInteger()
+
+android {
+    namespace 'es.jesuscg12.hucha'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'es.jesuscg12.hucha'
+        minSdk 29
+        targetSdk 34
+        versionCode huchaVersion
+        versionName '1.0.' + huchaVersion
+    }
+
+    signingConfigs {
+        release {
+            // Llave de firma de la app. Las actualizaciones solo se instalan encima si van firmadas con la misma.
+            storeFile file('../hucha.keystore')
+            storePassword System.getenv('HUCHA_KEYSTORE_PASSWORD') ?: 'hucha-android'
+            keyAlias 'hucha'
+            keyPassword System.getenv('HUCHA_KEYSTORE_PASSWORD') ?: 'hucha-android'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

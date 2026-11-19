@@ -8,12 +8,12 @@
 
 Gratis · Sin cuentas ni registros · Tus datos no salen de tu móvil · Funciona sin conexión
 
-### [👉 Abrir Hucha](https://jesuscg12.github.io/Hucha/)
+### [🤖 Descargar para Android (APK)](https://github.com/JesusCG12/Hucha/releases/latest/download/Hucha.apk) &nbsp;·&nbsp; [🍎 Abrir en iPhone o en el navegador](https://jesuscg12.github.io/Hucha/)
 
 <br>
 
 <img src="docs/capturas/resumen.png" alt="Pantalla de resumen" width="240">&nbsp;&nbsp;
-<img src="docs/capturas/movimientos.png" alt="Lista de movimientos" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/graficos.png" alt="Gráfico del ritmo del mes" width="240">&nbsp;&nbsp;
 <img src="docs/capturas/resumen-oscuro.png" alt="Resumen en modo oscuro" width="240">
 
 </div>
@@ -29,27 +29,36 @@ Gratis · Sin cuentas ni registros · Tus datos no salen de tu móvil · Funcion
 | 🔁 **Gastos fijos y suscripciones** | Alquiler, Spotify, el coche, la nómina… Los apuntas una vez y se añaden solos cada mes el día que toca. Eliges si duran siempre o solo unos meses. |
 | 🔮 **Ver los próximos meses** | Los fijos que aún no han llegado salen como *previstos*, así sabes de antemano lo que te va a quedar. |
 | 🐷 **Hucha de ahorro** | Apartas dinero cuando quieras (o cada mes, como fijo) y ves cuánto llevas en total y lo que te falta para tu meta. Lo que apartas se resta de lo disponible. |
-| 📊 **Saber en qué se va** | Reparto por categorías, límites por categoría (te avisa si te pasas) y gráfico de los últimos seis meses. |
+| 📈 **Ritmo del mes** | Un gráfico con lo que llevas gastado día a día frente al ritmo ideal, y una previsión de cómo acabarás el mes si sigues así. |
+| 🍩 **Saber en qué se va** | Donut con el reparto por categorías, límites por categoría (te avisa si te pasas) y barras de los últimos seis meses. |
 | 🌙 **Modo oscuro** | Se pone solo si tu móvil lo usa. |
 
 ---
 
 ## 📲 Instalarla en el móvil
 
-Hucha es una web que se instala como una app: icono en la pantalla de inicio, pantalla completa y funciona sin conexión. No hace falta App Store.
+### 🤖 Android: app (APK)
 
-### iPhone
+1. Desde el móvil, descarga **[Hucha.apk](https://github.com/JesusCG12/Hucha/releases/latest/download/Hucha.apk)**.
+2. Ábrelo desde la notificación de descarga o desde **Archivos → Descargas**.
+3. Si Android te avisa de que no permite instalar apps de ese origen, pulsa **Ajustes**, activa **Permitir de esta fuente** y vuelve atrás.
+4. Pulsa **Instalar**. Si Play Protect dice que es una app desconocida, elige **Instalar de todas formas** (es normal en apps que no vienen de Google Play).
+
+Funciona sin conexión y no pide ningún permiso. Necesita Android 10 o posterior.
+
+> [!NOTE]
+> **Para actualizar**, descarga el APK nuevo con el mismo enlace e instálalo encima: tus datos se mantienen. Las versiones están en [Releases](https://github.com/JesusCG12/Hucha/releases).
+
+### 🍎 iPhone (y cualquier navegador)
+
+En iPhone, Hucha es una web que se instala como una app: icono en la pantalla de inicio, pantalla completa y funciona sin conexión. No hace falta App Store.
 
 1. Abre **[jesuscg12.github.io/Hucha](https://jesuscg12.github.io/Hucha/)** en **Safari**.
 2. Pulsa el botón **Compartir** (el cuadrado con la flecha hacia arriba).
 3. Baja y elige **Añadir a pantalla de inicio** → **Añadir**.
 4. Ábrela siempre desde el icono 🐷.
 
-### Android
-
-1. Abre **[jesuscg12.github.io/Hucha](https://jesuscg12.github.io/Hucha/)** en **Chrome**.
-2. Pulsa el menú **⋮** (arriba a la derecha).
-3. Elige **Instalar app** o **Añadir a pantalla de inicio**.
+¿Prefieres no instalar el APK en Android? También puedes abrir la web en **Chrome** y usar **⋮ → Instalar app**.
 
 > [!TIP]
 > También puedes usarla en el ordenador, en cualquier navegador. Pero ojo: cada dispositivo guarda sus propios datos (mira [Tus datos](#-tus-datos)).
@@ -75,7 +84,7 @@ Al abrirla por primera vez verás **datos de ejemplo** para que te hagas una ide
 
 ## 🧭 Las cuatro pestañas
 
-**📊 Resumen.** Lo **disponible** del mes en grande, con una barra que marca el día de hoy para saber si vas bien de ritmo. Debajo: ingresos, gastos (con el ahorro incluido) y lo que has apartado; tu hucha con el total y la meta; en qué categorías se te va el dinero; y el gráfico de seis meses. Con las flechas cambias de mes, también a meses futuros para ver lo que te quedará.
+**📊 Resumen.** Lo **disponible** del mes en grande, con una barra que marca el día de hoy para saber si vas bien de ritmo. Debajo: ingresos, gastos (con el ahorro incluido) y lo que has apartado; el **ritmo del mes** con la previsión de cómo acabarás; tu hucha con el anillo de la meta; el donut de categorías; y las barras de seis meses. Con las flechas cambias de mes, también a meses futuros para ver lo que te quedará.
 
 **🧾 Movimientos.** Todo lo apuntado en el mes, agrupado por días. Puedes filtrar por gastos, ingresos o ahorro. Toca uno para editarlo o borrarlo. Arriba aparecen los fijos **previstos** que aún no han llegado.
 
@@ -84,7 +93,9 @@ Al abrirla por primera vez verás **datos de ejemplo** para que te hagas una ide
 **⚙️ Ajustes.** Presupuesto, hucha de ahorro, categorías (con su emoji, color y límite mensual), copia de seguridad y borrar todo.
 
 <div align="center">
-<img src="docs/capturas/hucha.png" alt="Tu hucha de ahorro" width="240">
+<img src="docs/capturas/categorias.png" alt="Donut de categorías" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/hucha.png" alt="Tu hucha de ahorro" width="240">&nbsp;&nbsp;
+<img src="docs/capturas/movimientos.png" alt="Lista de movimientos" width="240">
 </div>
 
 ---
@@ -96,7 +107,7 @@ Al abrirla por primera vez verás **datos de ejemplo** para que te hagas una ide
 - Si borras la app o los datos de Safari/Chrome, se borra lo que tenías. Por eso:
 
 > [!IMPORTANT]
-> Haz una copia de vez en cuando en **Ajustes → Exportar copia**. Se guarda un archivo `.json` con todo. Con **Importar copia** lo recuperas, o lo pasas a otro móvil.
+> Haz una copia de vez en cuando en **Ajustes → Exportar copia**. Se guarda un archivo `.json` con todo (en Android, en **Descargas/Hucha**). Con **Importar copia** lo recuperas, o lo pasas a otro móvil.
 
 ---
 
@@ -142,14 +153,19 @@ Porque no le hace falta: es una web instalable (PWA). Se instala desde el navega
 
 ## 🛠️ Para curiosos
 
-Hucha es una sola página web (`index.html`) con HTML, CSS y JavaScript, sin librerías ni servidor. Los datos se guardan con `localStorage` y el `sw.js` (service worker) permite usarla sin conexión.
+Hucha es una sola página web (`index.html`) con HTML, CSS y JavaScript, sin librerías ni servidor; los gráficos son SVG dibujados a mano. Los datos se guardan con `localStorage` y el `sw.js` (service worker) permite usarla sin conexión.
+
+La app de Android es un `WebView` que lleva dentro esa misma página y sus fuentes. Cada vez que cambia `index.html`, **GitHub Actions** compila el APK, lo firma y lo publica en Releases.
 
 ```
-├── index.html            ← la app entera
-├── sw.js                 ← modo sin conexión
-├── manifest.webmanifest  ← nombre, icono y colores al instalarla
-├── icons/                ← iconos de la app
-└── docs/capturas/        ← imágenes de este README
+├── index.html                      ← la app entera
+├── sw.js                           ← modo sin conexión (web)
+├── manifest.webmanifest            ← nombre, icono y colores al instalarla (web)
+├── icons/                          ← iconos de la app
+├── android/                        ← proyecto Android (Gradle + Java)
+├── tools/android_assets.py         ← prepara index.html y las fuentes para el APK
+├── .github/workflows/android.yml   ← compila y publica Hucha.apk
+└── docs/capturas/                  ← imágenes de este README
 ```
 
 ¿Quieres tu propia copia? Haz un **fork** de este repositorio y activa **Settings → Pages → Deploy from a branch → main / (root)**. En un par de minutos tendrás tu Hucha en `https://TU_USUARIO.github.io/Hucha/`.

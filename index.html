@@ -1122,7 +1122,8 @@ const Core = (() => {
     const s = S();
     const catRow = c => '<li><button type="button" class="mov" data-act="cat" data-id="' + esc(c.id) + '"><span class="bubble" style="--c:' + esc(c.color) + '" aria-hidden="true">' + esc(c.emoji) + '</span><span class="mov-main"><span class="mov-title">' + esc(c.name) + '</span><span class="mov-sub">' + (c.kind === 'income' ? 'Ingreso' : c.limitCents ? 'Límite de ' + money(c.limitCents) + ' al mes' : 'Sin límite') + '</span></span><span class="chev" aria-hidden="true">›</span></button></li>';
     const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-    const install = !claudeApi() && !standalone && !window.HuchaAndroid ? '<section class="block"><h2>Tenerla como app</h2><p class="note">En Safari toca Compartir y elige Añadir a pantalla de inicio. Se abrirá a pantalla completa y funcionará sin conexión.</p></section>' : '';
+    const nativeApp = !!(window.HuchaAndroid || (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.huchaSave));
+    const install = !claudeApi() && !standalone && !nativeApp ? '<section class="block"><h2>Tenerla como app</h2><p class="note">En Safari toca Compartir y elige Añadir a pantalla de inicio. Se abrirá a pantalla completa y funcionará sin conexión.</p></section>' : '';
     return banner() +
       '<section class="block"><h2>Presupuesto mensual</h2><p class="note">Lo que te permites gastar cada mes, fijos incluidos.</p>' +
       '<form data-form="budget" class="inline" novalidate><label class="field" for="budget" style="flex:1"><span class="lab">Importe en euros</span><input id="budget" name="budget" inputmode="decimal" autocomplete="off" placeholder="0,00" value="' + (s.budgetCents ? Core.plainAmount(s.budgetCents) : '') + '"></label><button type="submit" class="btn primary" style="align-self:flex-end">Guardar</button></form></section>' +
@@ -1395,6 +1396,13 @@ const Core = (() => {
     const st = app.state;
     const data = JSON.stringify({ version: 1, currency: st.currency, budgetCents: st.budgetCents, savingsStartCents: st.savingsStartCents, savingsGoalCents: st.savingsGoalCents, categories: st.categories, movements: st.movements, recurring: st.recurring }, null, 2);
     const filename = 'hucha-copia-' + today() + '.json';
+    // App de iPhone: la copia se abre en el menú Compartir para guardarla en Archivos.
+    const iosSave = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.huchaSave;
+    if (iosSave) {
+      try { iosSave.postMessage({ filename: filename, data: data }); toast('Elige dónde guardar la copia, por ejemplo en Archivos.'); }
+      catch (e) { toast('No se ha podido preparar la copia. Inténtalo otra vez.'); }
+      return;
+    }
     if (window.HuchaAndroid && window.HuchaAndroid.saveFile) {
       let where = '';
       try { where = window.HuchaAndroid.saveFile(filename, data); } catch (e) { where = ''; }
